@@ -55,8 +55,8 @@
         (= *force* :agent)  true
         (= *force* :direct) false)
     (send-off *logging-agent*
-      (fn [_#] (impl/write! logger level throwable message)))
-    (impl/write! logger level throwable message)))
+      (fn [_#] (impl-write! log level throwable marker message)))
+    (impl-write! log level throwable marker message)))
 
 (declare ^{:dynamic true} *logger-factory*) ; default LoggerFactory instance for calling impl/get-logger
 
@@ -67,12 +67,26 @@
     `(log ~level nil ~message))
   ([level throwable message]
     `(log ~*ns* ~level ~throwable ~message))
-  ([logger-ns level throwable message]
-    `(log *logger-factory* ~logger-ns ~level ~throwable ~message))
-  ([logger-factory logger-ns level throwable message]
-    `(let [logger# (impl/get-logger ~logger-factory ~logger-ns)]
-       (if (impl/enabled? logger# ~level)
-         (log* logger# ~level ~throwable ~message)))))
+  ([log-ns level throwable message]
+    `(log *log-factory* ~log-ns ~level ~throwable ~message))
+  ([log-factory log-ns level throwable message]
+    `(let [log# (impl-get-log ~log-factory ~log-ns)]
+       (if (impl-enabled? log# ~level)
+         (log* log# ~level ~throwable nil ~message)))))
+
+(defmacro logm
+  "Evaluates and logs a message with a marker only if the specified level is enabled. See log*
+  for more details."
+  ([level marker message]
+    `(logm ~level ~marker nil ~message))
+  ([level marker throwable message]
+    `(logm ~*ns* ~level ~marker ~throwable ~message))
+  ([log-ns level marker throwable message]
+    `(logm *log-factory* ~log-ns ~level ~marker ~throwable ~message))
+  ([log-factory log-ns level marker throwable message]
+    `(let [log# (impl-get-log ~log-factory ~log-ns)]
+       (if (impl-enabled? log# ~level)
+         (log* log# ~level ~throwable ~marker ~message)))))
 
 (defmacro logp
   "Logs a message using print style args. Can optionally take a throwable as its
@@ -84,8 +98,8 @@
     `(let [logger# (impl/get-logger *logger-factory* ~*ns*)]
        (if (impl/enabled? logger# ~level)
          (if (instance? Throwable ~x) ; type check only when enabled
-           (log* logger# ~level ~x (print-str ~@more))
-           (log* logger# ~level nil (print-str ~x ~@more)))))))
+           (log* log# ~level ~x nil (print-str ~@more))
+           (log* log# ~level nil nil (print-str ~x ~@more)))))))
 
 (defmacro logf
   "Logs a message using a format string and args. Can optionally take a
@@ -97,8 +111,8 @@
     `(let [logger# (impl/get-logger *logger-factory* ~*ns*)]
        (if (impl/enabled? logger# ~level)
          (if (instance? Throwable ~x) ; type check only when enabled
-           (log* logger# ~level ~x (format ~@more))
-           (log* logger# ~level nil (format ~x ~@more)))))))
+           (log* log# ~level ~x nil (format ~@more))
+           (log* log# ~level nil nil (format ~x ~@more)))))))
 
 (defmacro enabled?
   "Returns true if the specific logging level is enabled.  Use of this macro
@@ -230,6 +244,42 @@
   {:arglists '([message & more] [throwable message & more])}
   [& args]
   `(logp :fatal ~@args))
+
+(defmacro tracem
+  "Trace level logging taking a Marker as the first argument."
+  {:arglists '([marker message] [marker throwable message])}
+  [& args]
+  `(logm :trace ~@args))
+
+(defmacro debugm
+  "Debug level logging taking a Marker as the first argument."
+  {:arglists '([marker message] [marker throwable message])}
+  [& args]
+  `(logm :debug ~@args))
+
+(defmacro infom
+  "Info level logging taking a Marker as the first argument."
+  {:arglists '([marker message] [marker throwable message])}
+  [& args]
+  `(logm :info ~@args))
+
+(defmacro warnm
+  "Warn level logging taking a Marker as the first argument."
+  {:arglists '([marker message] [marker throwable message])}
+  [& args]
+  `(logm :warn ~@args))
+
+(defmacro errorm
+  "Error level logging taking a Marker as the first argument."
+  {:arglists '([marker message] [marker throwable message])}
+  [& args]
+  `(logm :error ~@args))
+
+(defmacro fatalm
+  "Fatal level logging taking a Marker as the first argument."
+  {:arglists '([marker message] [marker throwable message])}
+  [& args]
+  `(logm :fatal ~@args))
 
 (defmacro tracef
   "Trace level logging using format."
