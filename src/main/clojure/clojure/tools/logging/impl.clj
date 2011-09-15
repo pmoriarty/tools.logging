@@ -17,7 +17,7 @@
   "The protocol through which the core api will interact with an underlying logging
   implementation.  Implementations should at least support the six standard
   logging levels if they wish to work from the level-specific macros."
-  (enabled? [logger level]
+  (enabled? [logger level marker]
     "Check if a particular level is enabled for the given Logger.")
   (write! [logger level throwable message]
     "Writes a log message to the given Logger."))

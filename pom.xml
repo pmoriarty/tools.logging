@@ -22,6 +22,25 @@
     <url>git@github.com:clojure/tools.logging.git</url>
   </scm>
 
+	<distributionManagement>
+		<repository>
+			<id>annadale-repository</id>
+			<name>Annadale Repository</name>
+			<url>scpexe://s2/var/www/localhost/htdocs/maven2</url>
+		</repository>
+	</distributionManagement>
+
+	<build>
+		<extensions>
+			<extension>
+				<groupId>org.apache.maven.wagon</groupId>
+				<artifactId>wagon-ssh</artifactId>
+				<version>1.0-beta-7</version>
+			</extension>
+		</extensions>
+	</build>
+
+
   <dependencies>
     <dependency>
       <groupId>org.slf4j</groupId>

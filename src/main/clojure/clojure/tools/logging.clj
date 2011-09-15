@@ -67,12 +67,12 @@
     `(log ~level nil ~message))
   ([level throwable message]
     `(log ~*ns* ~level ~throwable ~message))
-  ([log-ns level throwable message]
-    `(log *log-factory* ~log-ns ~level ~throwable ~message))
-  ([log-factory log-ns level throwable message]
-    `(let [log# (impl-get-log ~log-factory ~log-ns)]
-       (if (impl-enabled? log# ~level)
-         (log* log# ~level ~throwable nil ~message)))))
+  ([logger-ns level throwable message]
+    `(log *logger-factory* ~logger-ns ~level ~throwable ~message))
+  ([logger-factory logger-ns level throwable message]
+    `(let [logger# (impl/get-logger ~logger-factory ~logger-ns)]
+       (if (impl/enabled? logger# ~level nil)
+         (log* logger# ~level ~throwable nil ~message)))))
 
 (defmacro logm
   "Evaluates and logs a message with a marker only if the specified level is enabled. See log*
@@ -81,12 +81,12 @@
     `(logm ~level ~marker nil ~message))
   ([level marker throwable message]
     `(logm ~*ns* ~level ~marker ~throwable ~message))
-  ([log-ns level marker throwable message]
-    `(logm *log-factory* ~log-ns ~level ~marker ~throwable ~message))
-  ([log-factory log-ns level marker throwable message]
-    `(let [log# (impl-get-log ~log-factory ~log-ns)]
-       (if (impl-enabled? log# ~level)
-         (log* log# ~level ~throwable ~marker ~message)))))
+  ([logger-ns level marker throwable message]
+    `(logm *logger-factory* ~logger-ns ~level ~marker ~throwable ~message))
+  ([logger-factory logger-ns level marker throwable message]
+    `(let [logger# (impl/get-logger ~logger-factory ~logger-ns)]
+       (if (impl/enabled? logger# ~level ~marker)
+         (log* logger# ~level ~throwable ~marker ~message)))))
 
 (defmacro logp
   "Logs a message using print style args. Can optionally take a throwable as its
@@ -96,7 +96,7 @@
   (if (or (instance? String x) (nil? more)) ; optimize for common case
     `(log ~level (print-str ~x ~@more))
     `(let [logger# (impl/get-logger *logger-factory* ~*ns*)]
-       (if (impl/enabled? logger# ~level)
+       (if (impl/enabled? logger# ~level nil)
          (if (instance? Throwable ~x) ; type check only when enabled
            (log* log# ~level ~x nil (print-str ~@more))
            (log* log# ~level nil nil (print-str ~x ~@more)))))))
@@ -109,7 +109,7 @@
   (if (or (instance? String x) (nil? more)) ; optimize for common case
     `(log ~level (format ~x ~@more))
     `(let [logger# (impl/get-logger *logger-factory* ~*ns*)]
-       (if (impl/enabled? logger# ~level)
+       (if (impl/enabled? logger# ~level nil)
          (if (instance? Throwable ~x) ; type check only when enabled
            (log* log# ~level ~x nil (format ~@more))
            (log* log# ~level nil nil (format ~x ~@more)))))))
@@ -121,7 +121,16 @@
   ([level]
     `(enabled? ~level ~*ns*))
   ([level logger-ns]
-    `(impl/enabled? (impl/get-logger *logger-factory* ~logger-ns) ~level)))
+    `(impl/enabled? (impl/get-logger *logger-factory* ~logger-ns) ~level nil)))
+
+(defmacro enabled-for-marker?
+  "Returns true if the specific logging level is enabled for the given marker.
+  Use of this macroshould only be necessary if one needs to execute alternate
+  code paths beyond whether the log should be written to."
+  ([level marker]
+    `(enabled-for-marker? ~level ~marker ~*ns*))
+  ([level marker logger-ns]
+    `(impl/enabled? (impl/get-logger *logger-factory* ~logger-ns) ~level ~marker)))
 
 (defmacro spy
   "Evaluates expr and may write the form and its result to the log. Returns the

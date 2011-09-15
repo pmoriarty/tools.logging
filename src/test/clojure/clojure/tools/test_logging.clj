@@ -16,12 +16,12 @@
 (def ^{:dynamic true} *entries* (atom []))
 
 (defn test-factory [enabled-set]
-  (reify log/LogFactory
-    (impl-name [_] "test factory")
-    (impl-get-log [_ log-ns]
-      (reify log/Log
-        (impl-enabled? [_ level] (contains? enabled-set level))
-        (impl-write! [_ lvl ex m msg]
+  (reify impl/LoggerFactory
+    (name [_] "test factory")
+    (get-logger [_ log-ns]
+      (reify impl/Logger
+        (enabled? [_ level marker] (contains? enabled-set level))
+        (write! [_ lvl ex m msg]
           (swap! *entries* conj [(str log-ns) lvl ex m msg]))))))
 
 (use-fixtures :once
@@ -216,7 +216,7 @@
 
 (deftest logm-msg1
   (let [m (MarkerFactory/getMarker "a")]
-    (log/logm :debug m "hello")
+    (logm :debug m "hello")
     (is (= ["clojure.tools.test-logging"
             :debug
             nil
@@ -227,7 +227,7 @@
 (deftest logm-with-ex
   (let [m (MarkerFactory/getMarker "a")
         e (Exception.)]
-    (log/logm :debug m e "hello")
+    (logm :debug m e "hello")
     (is (= ["clojure.tools.test-logging"
             :debug
             e
@@ -241,6 +241,7 @@
     (logf :debug a b))
   (is (= ["clojure.tools.test-logging"
           :debug
+          nil
           nil
           "foo bar"]
         (peek @*entries*))))
@@ -282,6 +283,27 @@
 (deftest enabled-false
   (binding [*logger-factory* (test-factory #{})]
     (is (= false (enabled? :fatal)))))
+
+(defn test-marker-factory [enabled-markers]
+  (reify impl/LoggerFactory
+    (name [_] "test factory")
+    (get-logger [_ log-ns]
+      (reify impl/Logger
+        (enabled? [_ level marker] (contains? enabled-markers marker))
+        (write! [_ lvl ex m msg]
+          (swap! *entries* conj [(str log-ns) lvl ex m msg]))))))
+
+(deftest enabled-for-marker
+  (testing "marker is used"
+    (binding [*logger-factory*
+              (test-marker-factory #{:enabled-marker})]
+      (is (not (enabled-for-marker? :fatal :disabled-marker)))
+      (is (enabled-for-marker? :fatal :enabled-marker))))
+  (testing "level is used"
+    (binding [*logger-factory* (test-factory #{:fatal})]
+      (is (not (enabled-for-marker? :error :marker)))
+      (is (enabled-for-marker? :fatal :marker))))
+  )
 
 (deftest spy-default
   (spy (+ 4 5))
