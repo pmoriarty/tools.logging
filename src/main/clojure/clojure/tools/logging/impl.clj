@@ -17,7 +17,7 @@
   "The protocol through which the core api will interact with an underlying logging
   implementation.  Implementations should at least support the six standard
   logging levels if they wish to work from the level-specific macros."
-  (enabled? [logger level marker]
+  (enabled? [logger level]
     "Check if a particular level is enabled for the given Logger.")
   (write! [logger level throwable message]
     "Writes a log message to the given Logger."))
@@ -32,52 +32,87 @@
   (get-logger [factory logger-ns]
     "Returns an implementation-specific Logger by namespace."))
 
+(def ^{:doc
+  "An slf4j Marker to include with log messages if the slf4j logger is used. Used by logm." :dynamic true}
+  *marker* nil)
+
 (defn slf4j-factory
   "Returns a SLF4J-based implementation of the LoggerFactory protocol, or nil if
   not available."
   []
   (try
-    (Class/forName "org.slf4j.Logger")
+   (Class/forName "org.slf4j.Logger")
     (eval
       `(do
         (extend org.slf4j.Logger
           Logger
           {:enabled?
-           (fn [logger# level#]
-             (condp = level#
-               :trace (.isTraceEnabled logger#)
-               :debug (.isDebugEnabled logger#)
-               :info  (.isInfoEnabled  logger#)
-               :warn  (.isWarnEnabled  logger#)
-               :error (.isErrorEnabled logger#)
-               :fatal (.isErrorEnabled logger#)
-               (throw (IllegalArgumentException. (str level#)))))
+           (fn [^org.slf4j.Logger logger# level#]
+             (if-let [^org.slf4j.Marker marker# *marker*]
+               (condp = level#
+                 :trace (.isTraceEnabled logger# marker#)
+                 :debug (.isDebugEnabled logger# marker#)
+                 :info  (.isInfoEnabled  logger# marker#)
+                 :warn  (.isWarnEnabled  logger# marker#)
+                 :error (.isErrorEnabled logger# marker#)
+                 :fatal (.isErrorEnabled logger# marker#)
+                 (throw (IllegalArgumentException. (str level#))))
+               (condp = level#
+                 :trace (.isTraceEnabled logger#)
+                 :debug (.isDebugEnabled logger#)
+                 :info  (.isInfoEnabled  logger#)
+                 :warn  (.isWarnEnabled  logger#)
+                 :error (.isErrorEnabled logger#)
+                 :fatal (.isErrorEnabled logger#)
+                 (throw (IllegalArgumentException. (str level#))))
+               ))
            :write!
            (fn [^org.slf4j.Logger logger# level# ^Throwable e# msg#]
              (let [^String msg# (str msg#)]
-               (if e#
-                 (condp = level#
-                   :trace (.trace logger# msg# e#)
-                   :debug (.debug logger# msg# e#)
-                   :info  (.info  logger# msg# e#)
-                   :warn  (.warn  logger# msg# e#)
-                   :error (.error logger# msg# e#)
-                   :fatal (.error logger# msg# e#)
-                   (throw (IllegalArgumentException. (str level#))))
-                 (condp = level#
-                   :trace (.trace logger# msg#)
-                   :debug (.debug logger# msg#)
-                   :info  (.info  logger# msg#)
-                   :warn  (.warn  logger# msg#)
-                   :error (.error logger# msg#)
-                   :fatal (.error logger# msg#)
-                   (throw (IllegalArgumentException. (str level#)))))))})
+               (if-let [^org.slf4j.Marker marker# *marker*]
+                 (if e#
+                   (condp = level#
+                     :trace (.trace logger# marker# msg# e#)
+                     :debug (.debug logger# marker# msg# e#)
+                     :info  (.info  logger# marker# msg# e#)
+                     :warn  (.warn  logger# marker# msg# e#)
+                     :error (.error logger# marker# msg# e#)
+                     :fatal (.error logger# marker# msg# e#)
+                     (throw (IllegalArgumentException. (str level#))))
+                   (condp = level#
+                     :trace (.trace logger# marker# msg#)
+                     :debug (.debug logger# marker# msg#)
+                     :info  (.info  logger# marker# msg#)
+                     :warn  (.warn  logger# marker# msg#)
+                     :error (.error logger# marker# msg#)
+                     :fatal (.error logger# marker# msg#)
+                     (throw (IllegalArgumentException. (str level#)))))
+                 (if e#
+                   (condp = level#
+                     :trace (.trace logger# msg# e#)
+                     :debug (.debug logger# msg# e#)
+                     :info  (.info  logger# msg# e#)
+                     :warn  (.warn  logger# msg# e#)
+                     :error (.error logger# msg# e#)
+                     :fatal (.error logger# msg# e#)
+                     (throw (IllegalArgumentException. (str level#))))
+                   (condp = level#
+                     :trace (.trace logger# msg#)
+                     :debug (.debug logger# msg#)
+                     :info  (.info  logger# msg#)
+                     :warn  (.warn  logger# msg#)
+                     :error (.error logger# msg#)
+                     :fatal (.error logger# msg#)
+                     (throw (IllegalArgumentException. (str level#)))))
+                 )))})
         (reify LoggerFactory
           (name [_#]
             "org.slf4j")
           (get-logger [_# logger-ns#]
             (org.slf4j.LoggerFactory/getLogger ^String (str logger-ns#))))))
-    (catch Exception e nil)))
+    (catch Exception e
+      (println e)
+      nil)))
 
 (defn cl-factory
   "Returns a Commons Logging-based implementation of the LoggerFactory protocol, or
